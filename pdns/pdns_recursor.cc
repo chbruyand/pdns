@@ -60,6 +60,7 @@
 #include <boost/shared_array.hpp>
 #include <boost/function.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/container/flat_set.hpp>
 #ifdef MALLOC_TRACE
 #include "malloctrace.hh"
 #endif
@@ -161,7 +162,7 @@ static time_t g_statisticsInterval;
 static bool g_useIncomingECS;
 std::atomic<uint32_t> g_maxCacheEntries, g_maxPacketCacheEntries;
 
-static std::set<uint16_t> s_avoidUdpSourcePorts;
+static boost::container::flat_set<uint16_t> s_avoidUdpSourcePorts;
 static uint16_t s_minUdpSourcePort;
 static uint16_t s_maxUdpSourcePort;
 
@@ -524,7 +525,7 @@ public:
         do {
           port = s_minUdpSourcePort + dns_random(s_maxUdpSourcePort - s_minUdpSourcePort + 1);
         }
-        while (std::find(s_avoidUdpSourcePorts.begin(), s_avoidUdpSourcePorts.end(), port) != s_avoidUdpSourcePorts.end());
+        while (s_avoidUdpSourcePorts.count(port));
       }
 
       sin=getQueryLocalAddress(family, port); // does htons for us
@@ -3207,29 +3208,6 @@ static int serviceMain(int argc, char*argv[])
     g_snmpAgent->run();
   }
 
-  const auto cpusMap = parseCPUMap();
-  if(g_numThreads == 1) {
-    L<<Logger::Warning<<"Operating unthreaded"<<endl;
-#ifdef HAVE_SYSTEMD
-    sd_notify(0, "READY=1");
-#endif
-    setCPUMap(cpusMap, 0, pthread_self());
-    recursorThread(0);
-  }
-  else {
-    pthread_t tid;
-    L<<Logger::Warning<<"Launching "<< g_numThreads <<" threads"<<endl;
-    for(unsigned int n=0; n < g_numThreads; ++n) {
-      pthread_create(&tid, 0, recursorThread, (void*)(long)n);
-
-      setCPUMap(cpusMap, n, tid);
-    }
-    void* res;
-#ifdef HAVE_SYSTEMD
-    sd_notify(0, "READY=1");
-#endif
-    pthread_join(tid, &res);
-  }
 
   int port = ::arg().asNum("min-udp-source-port");
   if(port < 1025 || port > 65535){
@@ -3255,6 +3233,30 @@ static int serviceMain(int argc, char*argv[])
       exit(99); // this isn't going to fix itself either
     }
     s_avoidUdpSourcePorts.insert(port);
+  }
+
+  const auto cpusMap = parseCPUMap();
+  if(g_numThreads == 1) {
+    L<<Logger::Warning<<"Operating unthreaded"<<endl;
+#ifdef HAVE_SYSTEMD
+    sd_notify(0, "READY=1");
+#endif
+    setCPUMap(cpusMap, 0, pthread_self());
+    recursorThread(0);
+  }
+  else {
+    pthread_t tid;
+    L<<Logger::Warning<<"Launching "<< g_numThreads <<" threads"<<endl;
+    for(unsigned int n=0; n < g_numThreads; ++n) {
+      pthread_create(&tid, 0, recursorThread, (void*)(long)n);
+
+      setCPUMap(cpusMap, n, tid);
+    }
+    void* res;
+#ifdef HAVE_SYSTEMD
+    sd_notify(0, "READY=1");
+#endif
+    pthread_join(tid, &res);
   }
   return 0;
 }
