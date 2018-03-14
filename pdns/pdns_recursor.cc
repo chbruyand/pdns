@@ -161,6 +161,10 @@ static time_t g_statisticsInterval;
 static bool g_useIncomingECS;
 std::atomic<uint32_t> g_maxCacheEntries, g_maxPacketCacheEntries;
 
+static std::set<uint16_t> s_avoidUdpSourcePorts;
+static uint16_t s_minUdpSourcePort;
+static uint16_t s_maxUdpSourcePort;
+
 RecursorControlChannel s_rcc; // only active in thread 0
 RecursorStats g_stats;
 string s_programname="pdns_recursor";
@@ -348,7 +352,7 @@ string GenUDPQueryResponse(const ComboAddress& dest, const string& query)
   Socket s(dest.sin4.sin_family, SOCK_DGRAM);
   s.setNonBlocking();
   ComboAddress local = getQueryLocalAddress(dest.sin4.sin_family, 0);
-  
+
   s.bind(local);
   s.connect(dest);
   s.send(query);
@@ -360,9 +364,9 @@ string GenUDPQueryResponse(const ComboAddress& dest, const string& query)
   t_fdm->addReadFD(s.getHandle(), handleGenUDPQueryResponse, pident);
 
   string data;
- 
+
   int ret=MT->waitEvent(pident,&data, g_networkTimeoutMsec);
- 
+
   if(!ret || ret==-1) { // timeout
     t_fdm->removeReadFD(s.getHandle());
   }
@@ -516,8 +520,12 @@ public:
 
       if(tries==1)  // fall back to kernel 'random'
         port = 0;
-      else
-        port = 1025 + dns_random(64510);
+      else {
+        do {
+          port = s_minUdpSourcePort + dns_random(s_maxUdpSourcePort - s_minUdpSourcePort + 1);
+        }
+        while (std::find(s_avoidUdpSourcePorts.begin(), s_avoidUdpSourcePorts.end(), port) != s_avoidUdpSourcePorts.end());
+      }
 
       sin=getQueryLocalAddress(family, port); // does htons for us
 
@@ -918,7 +926,7 @@ static void startDoResolve(void *p)
             g_stats.policyResults[appliedPolicy.d_kind]++;
             delete dc;
             dc=0;
-            return; 
+            return;
           case DNSFilterEngine::PolicyKind::NXDOMAIN:
             g_stats.policyResults[appliedPolicy.d_kind]++;
             res=RCode::NXDomain;
@@ -937,7 +945,7 @@ static void startDoResolve(void *p)
           case DNSFilterEngine::PolicyKind::Truncate:
             if(!dc->d_tcp) {
               g_stats.policyResults[appliedPolicy.d_kind]++;
-              res=RCode::NoError;	
+              res=RCode::NoError;
               pw.getHeader()->tc=1;
               goto haveAnswer;
             }
@@ -1029,7 +1037,7 @@ static void startDoResolve(void *p)
             g_stats.policyDrops++;
             delete dc;
             dc=0;
-            return; 
+            return;
           case DNSFilterEngine::PolicyKind::NXDOMAIN:
             ret.clear();
             res=RCode::NXDomain;
@@ -1067,7 +1075,7 @@ static void startDoResolve(void *p)
       return;
     }
     if(tracedQuery || res == -1 || res == RCode::ServFail || pw.getHeader()->rcode == RCode::ServFail)
-    { 
+    {
       string trace(sr.getTrace());
       if(!trace.empty()) {
         vector<string> lines;
@@ -1100,7 +1108,7 @@ static void startDoResolve(void *p)
             if(sr.doLog()) {
               L<<Logger::Warning<<"Answer to "<<dc->d_mdp.d_qname<<"|"<<QType(dc->d_mdp.d_qtype).getName()<<" for "<<dc->getRemote()<<" validates correctly"<<endl;
             }
-            
+
             // Is the query source interested in the value of the ad-bit?
             if (dc->d_mdp.d_header.ad || DNSSECOK)
               pw.getHeader()->ad=1;
@@ -1109,20 +1117,20 @@ static void startDoResolve(void *p)
             if(sr.doLog()) {
               L<<Logger::Warning<<"Answer to "<<dc->d_mdp.d_qname<<"|"<<QType(dc->d_mdp.d_qtype).getName()<<" for "<<dc->getRemote()<<" validates as Insecure"<<endl;
             }
-            
+
             pw.getHeader()->ad=0;
           }
           else if(state == Bogus) {
             if(g_dnssecLogBogus || sr.doLog() || g_dnssecmode == DNSSECMode::ValidateForLog) {
               L<<Logger::Warning<<"Answer to "<<dc->d_mdp.d_qname<<"|"<<QType(dc->d_mdp.d_qtype).getName()<<" for "<<dc->getRemote()<<" validates as Bogus"<<endl;
             }
-            
+
             // Does the query or validation mode sending out a SERVFAIL on validation errors?
             if(!pw.getHeader()->cd && (g_dnssecmode == DNSSECMode::ValidateAll || dc->d_mdp.d_header.ad || DNSSECOK)) {
               if(sr.doLog()) {
                 L<<Logger::Warning<<"Sending out SERVFAIL for "<<dc->d_mdp.d_qname<<"|"<<QType(dc->d_mdp.d_qtype).getName()<<" because recursor or query demands it for Bogus results"<<endl;
               }
-              
+
               pw.getHeader()->rcode=RCode::ServFail;
               goto sendit;
             } else {
@@ -1220,7 +1228,7 @@ static void startDoResolve(void *p)
       if(g_fromtosockets.count(dc->d_socket)) {
 	addCMsgSrcAddr(&msgh, cbuf, &dc->d_local, 0);
       }
-      if(sendmsg(dc->d_socket, &msgh, 0) < 0 && g_logCommonErrors) 
+      if(sendmsg(dc->d_socket, &msgh, 0) < 0 && g_logCommonErrors)
         L<<Logger::Warning<<"Sending UDP reply to client "<<dc->getRemote()<<" failed with: "<<strerror(errno)<<endl;
       if(!SyncRes::s_nopacketcache && !variableAnswer && !sr.wasVariable() ) {
         t_packetCache->insertResponsePacket(dc->d_tag, dc->d_qhash, dc->d_mdp.d_qname, dc->d_mdp.d_qtype, dc->d_mdp.d_qclass,
@@ -1283,7 +1291,7 @@ static void startDoResolve(void *p)
       if(!shouldNotValidate && sr.isDNSSECValidationRequested()) {
 	L<< ", dnssec="<<vStates[sr.getValidationState()];
       }
-	
+
       L<<endl;
 
     }
@@ -1926,7 +1934,7 @@ static void handleNewUDPQuestion(int fd, FDMultiplexer::funcparam_t& var)
         auto loc = rplookup(g_listenSocketsAddresses, fd);
 	if(HarvestDestinationAddress(&msgh, &dest)) {
           // but.. need to get port too
-          if(loc) 
+          if(loc)
             dest.sin4.sin_port = loc->sin4.sin_port;
         }
         else {
@@ -2103,7 +2111,7 @@ static void makeUDPServerSockets(unsigned int threadId)
     setSocketReceiveBuffer(fd, 250000);
     sin.sin4.sin_port = htons(st.port);
 
-  
+
 #ifdef SO_REUSEPORT
     if(g_reusePort) {
       if(setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &one, sizeof(one)) < 0)
@@ -2722,7 +2730,7 @@ static void checkLinuxIPv6Limits()
 }
 static void checkOrFixFDS()
 {
-  unsigned int availFDs=getFilenumLimit(); 
+  unsigned int availFDs=getFilenumLimit();
   unsigned int wantFDs = g_maxMThreads * g_numWorkerThreads +25; // even healthier margin then before
 
   if(wantFDs > availFDs) {
@@ -2973,7 +2981,7 @@ static int serviceMain(int argc, char*argv[])
 
   g_maxCacheEntries = ::arg().asNum("max-cache-entries");
   g_maxPacketCacheEntries = ::arg().asNum("max-packetcache-entries");
-  
+
   try {
     loadRecursorLuaConfig(::arg()["lua-config-file"], ::arg().mustDo("daemon"));
   }
@@ -3221,6 +3229,32 @@ static int serviceMain(int argc, char*argv[])
     sd_notify(0, "READY=1");
 #endif
     pthread_join(tid, &res);
+  }
+
+  int port = ::arg().asNum("min-udp-source-port");
+  if(port < 1025 || port > 65535){
+    L<<Logger::Error<<"Unable to launch, min-udp-source-port is not a valid port number"<<endl;
+    exit(99); // this isn't going to fix itself either
+  }
+  s_minUdpSourcePort = port;
+
+  port = ::arg().asNum("max-udp-source-port");
+  if(port < 1025 || port > 65535 || port < s_minUdpSourcePort){
+    L<<Logger::Error<<"Unable to launch, max-udp-source-port is not a valid port number or is smaller than min-udp-source-port"<<endl;
+    exit(99); // this isn't going to fix itself either
+  }
+  s_maxUdpSourcePort = port;
+
+  std::vector<string> parts {};
+  stringtok(parts, ::arg()["avoid-udp-source-port"], ", ");
+  for (const auto &part : parts)
+  {
+    port = std::stoi(part);
+    if(port < 1025 || port > 65535){
+      L<<Logger::Error<<"Unable to launch, avoid-udp-source-port contains an invalid port number: "<<part<<endl;
+      exit(99); // this isn't going to fix itself either
+    }
+    s_avoidUdpSourcePorts.insert(port);
   }
   return 0;
 }
@@ -3500,7 +3534,7 @@ int main(int argc, char **argv)
 
     ::arg().set("include-dir","Include *.conf files from this directory")="";
     ::arg().set("security-poll-suffix","Domain name from which to query security update notifications")="secpoll.powerdns.com.";
-    
+
     ::arg().setSwitch("reuseport","Enable SO_REUSEPORT allowing multiple recursors processes to listen to 1 address")="no";
 
     ::arg().setSwitch("snmp-agent", "If set, register as an SNMP agent")="no";
@@ -3515,6 +3549,11 @@ int main(int argc, char **argv)
 
     ::arg().set("xpf-allow-from","XPF information is only processed from these subnets")="";
     ::arg().set("xpf-rr-code","XPF option code to use")="0";
+
+    ::arg().set("min-udp-source-port", "Minimum UDP port to bind on")="1025";
+    ::arg().set("max-udp-source-port", "Maximum UDP port to bind on")="65535";
+    ::arg().set("avoid-udp-source-port", "List of comma separated UDP port number to avoid")="11211";
+
 
     ::arg().setCmd("help","Provide a helpful message");
     ::arg().setCmd("version","Print version string");
