@@ -36,7 +36,7 @@ before_script:
   - export OPTFLAGS=-O0
 
 script:
-  - chmod o+rwX "${TRAVIS_BUILD_DIR}"
+  - chmod --recursive o+rwX "${TRAVIS_BUILD_DIR}"
   - docker run --name builder --mount src="${TRAVIS_BUILD_DIR}",target=/home/travis/,type=bind --env TRAVIS_BUILD_DIR --env POSIXLY_CORRECT --env CFLAGS --env CXXFLAGS --env OPTFLAGS chbruyand/pdns-builder /bin/bash -x -c "cd /home/travis/ ; ls -la ; ./build-scripts/travis.sh"
 
 #notifications:
