@@ -359,13 +359,6 @@ install_recursor() {
 
 install_dnsdist() {
   # test requirements / setup
-  run "sudo add-apt-repository -y ppa:zeha/libfstrm-ppa"
-  run 'curl "http://keyserver.ubuntu.com:11371/pks/lookup?op=get&search=0x396160EF8126A2E2" | sudo apt-key add - '
-  run "sudo apt-get -qq update"
-  run "sudo apt-get -qq --no-install-recommends install \
-    snmpd \
-    libsnmp-dev \
-    libfstrm-dev"
   run "sudo sed -i \"s/agentxperms 0700 0755 dnsdist/agentxperms 0700 0755 ${USER}/g\" regression-tests.dnsdist/snmpd.conf"
   run "sudo cp -f regression-tests.dnsdist/snmpd.conf /etc/snmp/snmpd.conf"
   run "sudo service snmpd restart"
@@ -594,21 +587,7 @@ test_repo(){
   run "git status | grep -q clean"
 }
 
-# global build requirements
-# Add botan 2.x when available in Travis CI
-run "sudo apt-get -qq --no-install-recommends install \
-  libboost-all-dev \
-  libluajit-5.1-dev \
-  libedit-dev \
-  libprotobuf-dev \
-  pandoc\
-  protobuf-compiler"
-
-run "cd .."
-run "wget http://ppa.launchpad.net/kalon33/gamesgiroll/ubuntu/pool/main/libs/libsodium/libsodium-dev_1.0.3-1~ppa14.04+1_amd64.deb"
-run "wget http://ppa.launchpad.net/kalon33/gamesgiroll/ubuntu/pool/main/libs/libsodium/libsodium13_1.0.3-1~ppa14.04+1_amd64.deb"
-run "sudo dpkg -i libsodium-dev_1.0.3-1~ppa14.04+1_amd64.deb libsodium13_1.0.3-1~ppa14.04+1_amd64.deb"
-run "cd ${TRAVIS_BUILD_DIR}"
+PDNS_BUILD_PRODUCT=dnsdist
 
 install_$PDNS_BUILD_PRODUCT
 

@@ -1,12 +1,14 @@
 sudo: required
+services:
+  - docker
 dist: trusty
 language: cpp
 compiler:
   - gcc
   - clang
 env:
-  - PDNS_BUILD_PRODUCT=auth
-  - PDNS_BUILD_PRODUCT=recursor
+#  - PDNS_BUILD_PRODUCT=auth
+#  - PDNS_BUILD_PRODUCT=recursor
   - PDNS_BUILD_PRODUCT=dnsdist
 
 matrix:
@@ -19,10 +21,12 @@ matrix:
       addons:
         apt:
           packages: ['clang-3.6']
-
+before_install:
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  - docker pull chbruyand/pdns-builder
+ 
 before_script:
   - git describe --always --dirty=+
-  - sudo rm -f /etc/apt/sources.list.d/*.list
 
   ### setup travis environment ###
   - sudo sysctl net.ipv6.conf.lo.disable_ipv6=0
@@ -30,16 +34,15 @@ before_script:
   - export CFLAGS=-O0
   - export CXXFLAGS=-O0
   - export OPTFLAGS=-O0
-  - sudo apt-get -qq update
 
 script:
-  - ./build-scripts/travis.sh
+  - docker run --name builder --mount src="${TRAVIS_BUILD_DIR}",target=/home/travis/,type=bind --env TRAVIS_BUILD_DIR --env POSIXLY_CORRECT --env CFLAGS --env CXXFLAGS --env OPTFLAGS chbruyand/pdns-builder /bin/bash -c "cd /home/travis/ ; ./build-scripts/travis.sh"
 
-notifications:
-  irc:
-    channels:
-      - secure: "RDw5WKYf/gS3JnfIdkK51U4K2Xg/WNMn1uB/5AZbHbcqZJ/ZnbILCu0eBC83blQr+UuaQG7/sUFhWbtwoivD2I/4wOQGWIysBEZ8bSoySPSc4u0YU45aPjN+Ohrrp9qw7Smts3tYHbrOqfLfZ39L8lJq06vuMoBp6eHVkSBT7AY="
-    template:
-      - "%{author} @ %{repository} / %{branch} - Build:#%{build_number} : %{message} - Changes: %{compare_url} - Build details: %{build_url}"
-    use_notice: true
-    skip_join: true
+#notifications:
+#  irc:
+#    channels:
+#      - secure: "RDw5WKYf/gS3JnfIdkK51U4K2Xg/WNMn1uB/5AZbHbcqZJ/ZnbILCu0eBC83blQr+UuaQG7/sUFhWbtwoivD2I/4wOQGWIysBEZ8bSoySPSc4u0YU45aPjN+Ohrrp9qw7Smts3tYHbrOqfLfZ39L8lJq06vuMoBp6eHVkSBT7AY="
+#    template:
+#      - "%{author} @ %{repository} / %{branch} - Build:#%{build_number} : %{message} - Changes: %{compare_url} - Build details: %{build_url}"
+#    use_notice: true
+#    skip_join: true
