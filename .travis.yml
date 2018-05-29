@@ -7,20 +7,21 @@ compiler:
   - gcc
   - clang
 env:
-#  - PDNS_BUILD_PRODUCT=auth
+  - PDNS_BUILD_PRODUCT=auth
 #  - PDNS_BUILD_PRODUCT=recursor
-  - PDNS_BUILD_PRODUCT=dnsdist
+#  - PDNS_BUILD_PRODUCT=dnsdist
 
 matrix:
-  exclude:
-    - compiler: clang
-      env: PDNS_BUILD_PRODUCT=recursor
-  include:
-    - compiler: clang
-      env: PDNS_BUILD_PRODUCT=recursor COMPILER=clang++-3.6
-      addons:
-        apt:
-          packages: ['clang-3.6']
+#  exclude:
+#    - compiler: clang
+#      env: PDNS_BUILD_PRODUCT=recursor
+#  include:
+#    - compiler: clang
+#      env: PDNS_BUILD_PRODUCT=recursor COMPILER=clang++-3.6
+#      addons:
+#        apt:
+#          packages: ['clang-3.6']
+
 before_install:
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
   - docker pull chbruyand/pdns-builder
