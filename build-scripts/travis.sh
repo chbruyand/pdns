@@ -229,7 +229,6 @@ install_auth() {
   run "sudo -u openldap mkdir -p /var/lib/ldap/powerdns"
   run "sudo ldapadd -Y EXTERNAL -H ldapi:/// -f ./modules/ldapbackend/testfiles/add.ldif"
 
-  run "sudo gem install bundler --no-rdoc --no-ri"
   run "cd modules/remotebackend"
   run "ruby -S bundle install"
   run "cd ../.."
