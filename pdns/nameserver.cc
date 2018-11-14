@@ -287,11 +287,10 @@ void UDPNameserver::send(DNSPacket *p)
 
   struct msghdr msgh;
   struct iovec iov;
-  char cbuf[256];
+  char cbuf[256] = {0};
 
-  fillMSGHdr(&msgh, &iov, cbuf, 0, (char*)buffer.c_str(), buffer.length(), &p->d_remote);
+  fillMSGHdr(&msgh, &iov, nullptr, 0, (char*)buffer.c_str(), buffer.length(), &p->d_remote);
 
-  msgh.msg_control=NULL;
   if(p->d_anyLocal) {
     addCMsgSrcAddr(&msgh, cbuf, p->d_anyLocal.get_ptr(), 0);
   }
