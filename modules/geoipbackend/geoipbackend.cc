@@ -122,7 +122,7 @@ void GeoIPBackend::initialize() {
     dom.domain = DNSName(domain["domain"].as<string>());
     dom.ttl = domain["ttl"].as<int>();
 
-    for(YAML::const_iterator recs = domain["records"].begin(); recs != domain["records"].end(); recs++) {
+    for(YAML::const_iterator recs = domain["records"].begin(); recs != domain["records"].end(); ++recs) {
       DNSName qname = DNSName(recs->first.as<string>());
       vector<GeoIPDNSResourceRecord> rrs;
 
@@ -143,7 +143,7 @@ void GeoIPBackend::initialize() {
         if (rec->second.IsNull()) {
           rr.content = "";
         } else if (rec->second.IsMap()) {
-           for(YAML::const_iterator iter = rec->second.begin(); iter != rec->second.end(); iter++) {
+           for(YAML::const_iterator iter = rec->second.begin(); iter != rec->second.end(); ++iter) {
              string attr = iter->first.as<string>();
              if (attr == "content") {
                string content = iter->second.as<string>();
@@ -173,14 +173,14 @@ void GeoIPBackend::initialize() {
       std::swap(dom.records[qname], rrs);
     }
 
-    for(YAML::const_iterator service = domain["services"].begin(); service != domain["services"].end(); service++) {
+    for(YAML::const_iterator service = domain["services"].begin(); service != domain["services"].end(); ++service) {
       unsigned int netmask4 = 0, netmask6 = 0;
       DNSName srvName{service->first.as<string>()};
       NetmaskTree<vector<string> > nmt;
 
       // if it's an another map, we need to iterate it again, otherwise we just add two root entries.
       if (service->second.IsMap()) {
-        for(YAML::const_iterator net = service->second.begin(); net != service->second.end(); net++) {
+        for(YAML::const_iterator net = service->second.begin(); net != service->second.end(); ++net) {
           vector<string> value;
           if (net->second.IsSequence()) {
             value = net->second.as<vector<string> >();
