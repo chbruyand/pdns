@@ -90,6 +90,7 @@ static vector<std::unique_ptr<GeoIPInterface> > s_geoip_files;
 
 string getGeoForLua(const std::string& ip, int qaint);
 static string queryGeoIP(const string &ip, bool v6, GeoIPInterface::GeoIPQueryAttribute attribute, GeoIPNetmask& gl);
+static string format2str(string sformat, const string& ip, bool v6, GeoIPNetmask& gl);
 
 void GeoIPBackend::initialize() {
   YAML::Node config;
@@ -514,7 +515,7 @@ string getGeoForLua(const std::string& ip, int qaint)
   return "";
 }
 
-bool queryGeoLocation(const string &ip, bool v6, GeoIPNetmask& gl, double& lat, double& lon,
+static bool queryGeoLocation(const string &ip, bool v6, GeoIPNetmask& gl, double& lat, double& lon,
                       boost::optional<int>& alt, boost::optional<int>& prec)
 {
   for(auto const& gi: s_geoip_files) {
@@ -528,7 +529,7 @@ bool queryGeoLocation(const string &ip, bool v6, GeoIPNetmask& gl, double& lat, 
   return false;
 }
 
-string GeoIPBackend::format2str(string sformat, const string& ip, bool v6, GeoIPNetmask& gl) {
+static string format2str(string sformat, const string& ip, bool v6, GeoIPNetmask& gl) {
   string::size_type cur,last;
   boost::optional<int> alt, prec;
   double lat, lon;

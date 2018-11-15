@@ -70,7 +70,6 @@ private:
   static pthread_rwlock_t s_state_lock;
 
   void initialize();
-  string format2str(string format, const string& ip, bool v6, GeoIPNetmask& gl);
   bool d_dnssec;
   bool hasDNSSECkey(const DNSName& name);
   bool lookup_static(const GeoIPDomain &dom, const DNSName &search, const QType &qtype, const DNSName& qdomain, const std::string &ip, GeoIPNetmask& gl, bool v6);
