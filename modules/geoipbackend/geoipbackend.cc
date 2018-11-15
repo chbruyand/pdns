@@ -262,7 +262,6 @@ void GeoIPBackend::initialize() {
     // finally fix weights
     for(auto &item: dom.records) {
       float weight=0;
-      float sum=0;
       bool has_weight=false;
       // first we look for used weight
       for(const auto &rr: item.second) {
@@ -270,6 +269,7 @@ void GeoIPBackend::initialize() {
         if (rr.has_weight) has_weight = true;
       }
       if (has_weight) {
+        float sum = 0;
         // put them back as probabilities and values..
         for(auto &rr: item.second) {
           rr.weight=static_cast<int>((static_cast<float>(rr.weight) / weight)*1000.0);
@@ -307,10 +307,10 @@ GeoIPBackend::~GeoIPBackend() {
 
 bool GeoIPBackend::lookup_static(const GeoIPDomain &dom, const DNSName &search, const QType &qtype, const DNSName& qdomain, const std::string &ip, GeoIPNetmask &gl, bool v6) {
   const auto& i = dom.records.find(search);
-  int cumul_probability = 0;
-  int probability_rnd = 1+(dns_random(1000)); // setting probability=0 means it never is used
 
   if (i != dom.records.end()) { // return static value
+    int probability_rnd = 1 + (dns_random(1000)); // setting probability=0 means it never is used
+    int cumul_probability = 0;
     for(const auto& rr : i->second) {
       if (rr.has_weight) {
         gl.netmask = (v6?128:32);
@@ -341,16 +341,16 @@ void GeoIPBackend::lookup(const QType &qtype, const DNSName& qdomain, DNSPacket 
   ReadLock rl(&s_state_lock);
   const GeoIPDomain* dom;
   GeoIPNetmask gl;
-  bool found = false;
 
   if (d_result.size()>0)
     throw PDNSException("Cannot perform lookup while another is running");
 
   d_result.clear();
 
-  if (zoneId > -1 && zoneId < static_cast<int>(s_domains.size()))
+  if (zoneId > -1 && zoneId < static_cast<int>(s_domains.size())) {
     dom = &(s_domains[zoneId]);
-  else {
+  } else {
+    bool found = false;
     for(const GeoIPDomain& i : s_domains) {   // this is arguably wrong, we should probably find the most specific match
       if (qdomain.isPartOf(i.domain)) {
         dom = &i;
@@ -559,12 +559,12 @@ string GeoIPBackend::format2str(string sformat, const string& ip, bool v6, GeoIP
     } else if (!sformat.compare(cur,3,"%ci")) {
       rep = queryGeoIP(ip, v6, GeoIPInterface::City, tmp_gl);
     } else if (!sformat.compare(cur,4,"%loc")) {
-      char ns, ew;
-      int d1, d2, m1, m2;
-      double s1, s2;
       if (!queryGeoLocation(ip, v6, gl, lat, lon, alt, prec)) {
         rep = "";
       } else {
+        char ns, ew;
+        int d1, d2, m1, m2;
+        double s1, s2;
         ns = (lat>0) ? 'N' : 'S';
         ew = (lon>0) ? 'E' : 'W';
         /* remove sign */
