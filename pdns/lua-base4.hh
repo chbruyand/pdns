@@ -25,7 +25,7 @@ public:
   void loadStream(std::istream &is);
   virtual ~BaseLua4(); // this is so unique_ptr works with an incomplete type
 protected:
-  void prepareContext();
+  void prepareContext(bool withDefaultLibraries = true);
   virtual void postPrepareContext() = 0;
   virtual void postLoad() = 0;
   typedef vector<pair<string, int> > in_t;

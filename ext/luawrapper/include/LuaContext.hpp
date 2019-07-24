@@ -90,6 +90,69 @@ class LuaContext {
     template<typename T> struct IsOptional;
     enum Globals_t { Globals }; // tag for "global variables"
 public:
+  void luaLoadLibrary(const char* libname, lua_CFunction luafunc) {
+#   if LUA_VERSION_NUM >= 502
+    // @see https://www.lua.org/manual/5.2/manual.html#6
+    luaL_requiref(mState, libname, luafunc, 1);
+#   else
+    // @see https://www.lua.org/manual/5.1/manual.html#5
+    lua_pushcfunction(mState, luafunc);
+    lua_pushstring(mState, libname);
+    lua_call(mState, 1, 0);
+#   endif
+  }
+  void luaLoadSafeLibraries() {
+    luaLoadLibrary("", luaopen_base);
+    luaLoadLibrary(LUA_TABLIBNAME, luaopen_table);
+    luaLoadLibrary(LUA_STRLIBNAME, luaopen_string);
+    luaLoadLibrary(LUA_MATHLIBNAME, luaopen_math);
+    luaLoadLibrary(LUA_DBLIBNAME, luaopen_debug);
+    /* we explicitely do not load the following libs :
+       - coroutine
+       - io
+       - os
+       - package
+    */
+#   if LUA_VERSION_NUM >= 502
+    luaLoadLibrary(LUA_UTF8LIBNAME, luaopen_utf8);
+    luaLoadLibrary(LUA_BITLIBNAME, luaopen_bit32);
+#   endif
+  }
+  void removeUnsupportedFunctions() {
+    lua_pushnil(mState);
+    lua_setglobal(mState, "loadfile");
+    lua_pushnil(mState);
+    lua_setglobal(mState, "dofile");
+  }
+  void luaLoadSafeEnvironment() {
+    luaLoadSafeLibraries();
+    removeUnsupportedFunctions();
+  }
+  static void sandboxEnvironment(lua_State* state)
+  {
+    // Creates a new environment table that inherits _G from the __index metamethod
+    lua_newtable(state); // (S: E)
+    // Creates the table that holds the metatable
+    lua_newtable(state); // (S: ME)
+    lua_getglobal(state,"_G"); // pushes _G onto the stack (S: GME)
+    lua_setfield(state, -2, "__index"); // M.__index = _G (S: ME)
+    lua_setmetatable(state, -2);  // pop the metatable and assign it to the new env (S: E)
+
+#   if LUA_VERSION_NUM >= 502
+
+    /* pop environment and assign it to the first upvalue
+       Starting from lua52, changing the env is done by replacing the first upvalue of the chunk we'll call
+       @see https://www.lua.org/manual/5.2/manual.html#2.2
+    */
+    lua_setupvalue(state, -2, 1);
+
+#   else
+
+    /* setup the environment of our function */
+    lua_setfenv(state, -2);
+
+#   endif
+  }
     /**
      * @param openDefaultLibs True if luaL_openlibs should be called
      */
@@ -109,8 +172,9 @@ public:
         });
 
         // opening default library if required to do so
-        if (openDefaultLibs)
+        if (openDefaultLibs) {
             luaL_openlibs(mState);
+        }
 
          writeGlobalEq();
     }
@@ -261,9 +325,12 @@ public:
      * Executes lua code from the stream
      * @param code      A stream that Lua will read its code from
      */
-    void executeCode(std::istream& code)
+    void executeCode(std::istream& code, bool sandboxed = false)
     {
         auto toCall = load(mState, code);
+        if (sandboxed) {
+          sandboxEnvironment(mState);
+        }
         call<std::tuple<>>(mState, std::move(toCall));
     }
 
@@ -273,10 +340,13 @@ public:
      * @tparam TType    The type that the executing code should return
      */
     template<typename TType>
-    auto executeCode(std::istream& code)
+    auto executeCode(std::istream& code, bool sandboxed = false)
         -> TType
     {
         auto toCall = load(mState, code);
+        if (sandboxed) {
+          sandboxEnvironment(mState);
+        }
         return call<TType>(mState, std::move(toCall));
     }
 
@@ -284,9 +354,9 @@ public:
      * Executes lua code given as parameter
      * @param code      A string containing code that will be executed by Lua
      */
-    void executeCode(const std::string& code)
+    void executeCode(const std::string& code, bool sandboxed = false)
     {
-        executeCode(code.c_str());
+      executeCode(code.c_str(), sandboxed);
     }
     
     /*
@@ -295,19 +365,22 @@ public:
      * @tparam TType    The type that the executing code should return
      */
     template<typename TType>
-    auto executeCode(const std::string& code)
+    auto executeCode(const std::string& code, bool sandboxed = false)
         -> TType
     {
-        return executeCode<TType>(code.c_str());
+      return executeCode<TType>(code.c_str(), sandboxed);
     }
 
     /**
      * Executes Lua code
      * @param code      A string containing code that will be executed by Lua
      */
-    void executeCode(const char* code)
+    void executeCode(const char* code, bool sandboxed = false)
     {
         auto toCall = load(mState, code);
+        if (sandboxed) {
+          sandboxEnvironment(mState);
+        }
         call<std::tuple<>>(mState, std::move(toCall));
     }
 
@@ -317,10 +390,13 @@ public:
      * @tparam TType    The type that the executing code should return
      */
     template<typename TType>
-    auto executeCode(const char* code)
+    auto executeCode(const char* code, bool sandboxed = false)
         -> TType
     {
         auto toCall = load(mState, code);
+        if (sandboxed) {
+          sandboxEnvironment(mState);
+        }
         return call<TType>(mState, std::move(toCall));
     }
 
@@ -328,9 +404,12 @@ public:
      * Executes lua code from the stream
      * @param code      A stream that Lua will read its code from
      */
-    void executeCode(const ThreadID& thread, std::istream& code)
+    void executeCode(const ThreadID& thread, std::istream& code, bool sandboxed = false)
     {
         auto toCall = load(thread.state, code);
+        if (sandboxed) {
+          sandboxEnvironment(mState);
+        }
         call<std::tuple<>>(thread.state, std::move(toCall));
     }
 
@@ -340,10 +419,13 @@ public:
      * @tparam TType    The type that the executing code should return
      */
     template<typename TType>
-    auto executeCode(const ThreadID& thread, std::istream& code)
+    auto executeCode(const ThreadID& thread, std::istream& code, bool sandboxed = false)
         -> TType
     {
         auto toCall = load(thread.state, code);
+        if (sandboxed) {
+          sandboxEnvironment(mState);
+        }
         return call<TType>(thread.state, std::move(toCall));
     }
 
@@ -351,9 +433,9 @@ public:
      * Executes lua code given as parameter
      * @param code      A string containing code that will be executed by Lua
      */
-    void executeCode(const ThreadID& thread, const std::string& code)
+    void executeCode(const ThreadID& thread, const std::string& code, bool sandboxed = false)
     {
-        executeCode(thread, code.c_str());
+      executeCode(thread, code.c_str(), sandboxed);
     }
     
     /*
@@ -362,19 +444,22 @@ public:
      * @tparam TType    The type that the executing code should return
      */
     template<typename TType>
-    auto executeCode(const ThreadID& thread, const std::string& code)
+    auto executeCode(const ThreadID& thread, const std::string& code, bool sandboxed = false)
         -> TType
     {
-        return executeCode<TType>(thread, code.c_str());
+      return executeCode<TType>(thread, code.c_str(), sandboxed);
     }
 
     /**
      * Executes Lua code
      * @param code      A string containing code that will be executed by Lua
      */
-    void executeCode(const ThreadID& thread, const char* code)
+    void executeCode(const ThreadID& thread, const char* code, bool sandboxed = false)
     {
         auto toCall = load(thread.state, code);
+        if (sandboxed) {
+          sandboxEnvironment(mState);
+        }
         call<std::tuple<>>(thread.state, std::move(toCall));
     }
 
@@ -384,10 +469,13 @@ public:
      * @tparam TType    The type that the executing code should return
      */
     template<typename TType>
-    auto executeCode(const ThreadID& thread, const char* code)
+    auto executeCode(const ThreadID& thread, const char* code, bool sandboxed = false)
         -> TType
     {
         auto toCall = load(thread.state, code);
+        if (sandboxed) {
+          sandboxEnvironment(mState);
+        }
         return call<TType>(thread.state, std::move(toCall));
     }
     

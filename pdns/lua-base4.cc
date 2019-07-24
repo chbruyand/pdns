@@ -39,9 +39,11 @@ BaseLua4::~BaseLua4() { }
 
 #include "ext/luawrapper/include/LuaContext.hpp"
 
-void BaseLua4::prepareContext() {
-  d_lw = std::unique_ptr<LuaContext>(new LuaContext);
-
+void BaseLua4::prepareContext(bool withDefaultLibraries) {
+  d_lw = std::unique_ptr<LuaContext>(new LuaContext(withDefaultLibraries));
+  if (!withDefaultLibraries) {
+    d_lw->luaLoadSafeEnvironment();
+  }
   // dnsheader
   d_lw->registerFunction<int(dnsheader::*)()>("getID", [](dnsheader& dh) { return ntohs(dh.id); });
   d_lw->registerFunction<bool(dnsheader::*)()>("getCD", [](dnsheader& dh) { return dh.cd; });

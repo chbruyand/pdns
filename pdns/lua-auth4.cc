@@ -16,7 +16,7 @@
 
 #include "ueberbackend.hh"
 
-AuthLua4::AuthLua4() { prepareContext(); }
+AuthLua4::AuthLua4() { prepareContext(false); }
 
 #if !defined(HAVE_LUA)
 
