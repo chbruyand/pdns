@@ -410,11 +410,16 @@ uint64_t SyncRes::doEDNSDump(int fd)
     return 0;
   }
   uint64_t count = 0;
-
   fprintf(fp.get(),"; edns from thread follows\n;\n");
   for(const auto& eds : t_sstorage.ednsstatus) {
     count++;
-    fprintf(fp.get(), "%s\t%d\t%s", eds.first.toString().c_str(), (int)eds.second.mode, ctime(&eds.second.modeSetAt));
+#ifdef HAVE_CTIME_R
+    std::string ctime_result{26};
+    const char* setAt = ctime_r(&eds.second.modeSetAt, &(ctime_result.front()));
+#else
+    const char* setAt = ctime(&eds.second.modeSetAt); // lgtm [cpp/potentially-dangerous-function]
+#endif
+    fprintf(fp.get(), "%s\t%d\t%s", eds.first.toString().c_str(), (int)eds.second.mode, setAt);
   }
   return count;
 }
@@ -457,7 +462,13 @@ uint64_t SyncRes::doDumpThrottleMap(int fd)
   {
     count++;
     // remote IP, dns name, qtype, count, ttd
-    fprintf(fp.get(), "%s\t%s\t%d\t%u\t%s", i.first.get<0>().toString().c_str(), i.first.get<1>().toLogString().c_str(), i.first.get<2>(), i.second.count, ctime(&i.second.ttd));
+#ifdef HAVE_CTIME_R
+    std::string ctime_result{26};
+    const char* ttd = ctime_r(&i.second.ttd, &(ctime_result.front()));
+#else
+    const char* ttd = ctime(&i.second.ttd); // lgtm [cpp/potentially-dangerous-function]
+#endif
+    fprintf(fp.get(), "%s\t%s\t%d\t%u\t%s", i.first.get<0>().toString().c_str(), i.first.get<1>().toLogString().c_str(), i.first.get<2>(), i.second.count, ttd);
   }
 
   return count;

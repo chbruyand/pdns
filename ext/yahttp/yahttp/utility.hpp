@@ -70,7 +70,7 @@ namespace YaHTTP {
        fromTm(&tm);
 #else
        struct tm *tm;
-       tm = localtime(&t);
+       tm = localtime(&t); // lgtm [cpp/potentially-dangerous-function]
        fromTm(tm);
 #endif
 #ifndef HAVE_TM_GMTOFF
@@ -79,7 +79,7 @@ namespace YaHTTP {
        gmtime_r(&t, &tm);
        t2 = mktime(&tm);
 # else
-       tm = gmtime(&t);
+       tm = gmtime(&t); // lgtm [cpp/potentially-dangerous-function]
        t2 = mktime(tm);
 # endif
        this->utc_offset = ((t2-t)/10)*10; // removes any possible differences. 
@@ -93,7 +93,7 @@ namespace YaHTTP {
        fromTm(&tm);
 #else
        struct tm *tm;
-       tm = gmtime(&t);
+       tm = gmtime(&t); // lgtm [cpp/potentially-dangerous-function]
        fromTm(tm);
 #endif
 #ifndef HAVE_TM_GMTOFF

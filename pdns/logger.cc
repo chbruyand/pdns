@@ -59,7 +59,11 @@ void Logger::log(const string &msg, Urgency u)
       struct tm tm;
       time_t t;
       time(&t);
-      tm=*localtime(&t);
+#ifdef HAVE_LOCALTIME_R
+      localtime_r(&t, &tm);
+#else
+      tm = localtime(&t); // lgtm [cpp/potentially-dangerous-function]
+#endif
       strftime(buffer,sizeof(buffer),"%b %d %H:%M:%S ", &tm);
     }
 
