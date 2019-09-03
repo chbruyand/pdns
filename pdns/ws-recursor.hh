@@ -27,9 +27,6 @@
 #include "mplexer.hh"
 #include "webserver.hh"
 
-class HttpRequest;
-class HttpResponse;
-
 class AsyncServer : public Server {
 public:
   AsyncServer(const string &localaddress, int port) : Server(localaddress, port) { };
@@ -69,7 +66,7 @@ public:
   void jsonstat(HttpRequest* req, HttpResponse *resp);
 
 private:
-  AsyncWebServer* d_ws;
+  std::unique_ptr<AsyncWebServer> d_ws;
 };
 
 #endif /* PDNS_WSRECURSOR_HH */
