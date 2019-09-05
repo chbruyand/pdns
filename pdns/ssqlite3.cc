@@ -239,7 +239,7 @@ void SSQLite3::execute(const string& query) {
       sqlite3_free(errmsg);
       throw("Failed to execute query: " + errstr);
     } else {
-      if ((rc = sqlite3_exec(m_pDB, query.c_str(), NULL, NULL, &errmsg) != SQLITE_OK) && rc != SQLITE_DONE && rc != SQLITE_ROW) {
+      if ((rc = sqlite3_exec(m_pDB, query.c_str(), NULL, NULL, &errmsg) != SQLITE_OK) && rc != SQLITE_DONE && rc != SQLITE_ROW) { // lgtm [cpp/constant-comparison]
         std::string errstr(errmsg);
         sqlite3_free(errmsg);
         throw("Failed to execute query: " + errstr);
