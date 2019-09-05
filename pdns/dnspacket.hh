@@ -57,6 +57,7 @@ class DNSPacket
 public:
   DNSPacket(bool isQuery);
   DNSPacket(const DNSPacket &orig);
+  DNSPacket& operator=(const DNSPacket &orig);
 
   int noparse(const char *mesg, size_t len); //!< just suck the data inward
   int parse(const char *mesg, size_t len); //!< parse a raw UDP or TCP packet and suck the data inward
@@ -82,7 +83,6 @@ public:
     return d_socket;
   }
   void setSocket(Utility::sock_t sock);
-
 
   // these manipulate 'd'
   void setA(bool); //!< make this packet authoritative - manipulates 'd'

@@ -193,6 +193,7 @@ class DTime
 public:
   DTime(); //!< Does not set the timer for you! Saves lots of gettimeofday() calls
   DTime(const DTime &dt);
+  DTime& operator=(const DTime& rhs);
   time_t time();
   inline void set();  //!< Reset the timer
   inline int udiff(); //!< Return the number of microseconds since the timer was last set.

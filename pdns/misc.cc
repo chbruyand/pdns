@@ -450,6 +450,12 @@ DTime::DTime()
 DTime::DTime(const DTime &dt) : d_set(dt.d_set)
 {
 }
+DTime& DTime::operator=(const DTime& rhs)
+{
+  d_set = rhs.d_set;
+
+  return *this;
+}
 
 time_t DTime::time()
 {

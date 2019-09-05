@@ -19,6 +19,16 @@ struct ResolveContext {
     this->d_auth = ctx.d_auth;
 #endif
   }
+  ResolveContext& operator=(const ResolveContext& ctx)
+  {
+#ifdef HAVE_PROTOBUF
+    d_initialRequestId = ctx.d_initialRequestId;
+#endif
+#ifdef HAVE_FSTRM
+    d_auth = ctx.d_auth;
+#endif
+    return *this;
+  }
 #ifdef HAVE_PROTOBUF
   boost::optional<const boost::uuids::uuid&> d_initialRequestId;
 #endif
