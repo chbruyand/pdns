@@ -218,10 +218,10 @@ class Pkcs11Slot {
 
   public:
   Pkcs11Slot(CK_FUNCTION_LIST* functions, const CK_SLOT_ID& slot) :
-      d_slot(slot),
-      d_functions(functions),
-      d_err(0),
-      d_logged_in(false)
+    d_logged_in(false),
+    d_functions(functions),
+    d_slot(slot),
+    d_err(0)
   {
       CK_TOKEN_INFO tokenInfo;
       pthread_mutex_init(&(this->d_m), NULL);
