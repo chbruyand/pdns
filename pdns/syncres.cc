@@ -36,6 +36,8 @@
 #include "syncres.hh"
 #include "dnsseckeeper.hh"
 #include "validate-recursor.hh"
+#include "negcache.hh"
+#include "rec-taskqueue.hh"
 
 thread_local SyncRes::ThreadLocalStorage SyncRes::t_sstorage;
 thread_local std::unique_ptr<addrringbuf_t> t_timeouts;
@@ -4278,7 +4280,59 @@ bool SyncRes::processAnswer(unsigned int depth, LWResult& lwr, const DNSName& qn
 
 bool SyncRes::doDoTtoAuth(const DNSName& ns) const
 {
-  return g_DoTToAuthNames.getLocal()->check(ns);
+  cerr<<"doDoTtoAuth ns="<<ns<<"? ";
+  auto ret=g_DoTToAuthNames.getLocal()->check(ns);
+  cerr<<(ret ? "yes" : "no")<<endl;
+
+  if (ret) {
+    // name is marked for DoT in the config, no need to check SVCB
+    return ret;
+  }
+
+  auto svcbname = DNSName("_dns")+ns;
+  cerr<<"svcbname="<<svcbname<<endl;
+
+  NegCache::NegCacheEntry ne;
+  auto negret=g_negCache->get(svcbname, QType::SVCB, getNow(), ne, false);
+  if (negret){
+    cerr<<"negative SVCB entry, returning false"<<endl;
+    return false;
+  }
+
+  // FIXME: check aggressive NSEC cache here
+
+  vector<DNSRecord> recs;
+  auto recret=g_recCache->get(d_now.tv_sec, svcbname, QType::SVCB, false, &recs, ComboAddress());
+  if (recret < 0) {
+    cerr<<"no positive or negative SVCB entry, queueing lookup and returning false"<<endl;
+    pushAlmostExpiredTask(svcbname, QType::SVCB, d_now.tv_sec+60); // FIXME: +60 is arbitrary
+    return false;
+
+  }
+  cerr<<"recret="<<recret<<endl;
+  cerr<<"recs.size()="<<recs.size()<<endl;
+  for (const auto &rec : recs) {
+    cerr<<rec.d_content->getZoneRepresentation()<<endl;
+    auto svcb = std::dynamic_pointer_cast<SVCBRecordContent>(rec.d_content);
+    cerr<<"priority="<<svcb->getPriority()<<endl;
+    cerr<<"target="<<svcb->getTarget()<<endl;
+    if (svcb->hasParam(SvcParam::SvcParamKey::port)) {
+      auto port = svcb->getParam(SvcParam::SvcParamKey::port).getPort();
+      cerr<<"port="<<port<<endl;
+      if (port != 853) {
+        continue;
+      }
+    }
+    auto alpns=svcb->getParam(SvcParam::SvcParamKey::alpn).getALPN();
+    cerr<<"getParam(alpn)="<<boost::join(alpns, ",")<<endl;
+    if (std::find(alpns.begin(), alpns.end(), "dot") != alpns.end()) {
+      cerr<<"found DoT alpn and port was correct, returning true"<<endl;
+      return true; // FIXME: there is no fallback when port 853 does not cooperate
+    } else {
+      continue;
+    }
+  }
+  return false;
 }
 
 /** returns:
