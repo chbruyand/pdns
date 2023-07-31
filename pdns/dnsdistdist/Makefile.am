@@ -209,6 +209,7 @@ dnsdist_SOURCES = \
 	dnstap.cc dnstap.hh \
 	dnswriter.cc dnswriter.hh \
 	doh.hh \
+	doq.hh \
 	dolog.hh \
 	ednscookies.cc ednscookies.hh \
 	ednsoptions.cc ednsoptions.hh \
@@ -428,6 +429,12 @@ if HAVE_LIBH2OEVLOOP
 dnsdist_SOURCES += doh.cc
 dnsdist_LDADD += $(LIBH2OEVLOOP_LIBS)
 endif
+
+endif
+
+if HAVE_DNS_OVER_QUIC
+
+dnsdist_SOURCES += doq.cc
 
 endif
 
