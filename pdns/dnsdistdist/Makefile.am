@@ -211,9 +211,9 @@ dnsdist_SOURCES = \
 	dnstap.cc dnstap.hh \
 	dnswriter.cc dnswriter.hh \
 	doh.hh \
+	doh3.hh \
 	dolog.hh \
 	doq.hh \
-	doh3.hh \
 	ednscookies.cc ednscookies.hh \
 	ednsextendederror.cc ednsextendederror.hh \
 	ednsoptions.cc ednsoptions.hh \
